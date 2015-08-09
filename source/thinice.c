@@ -761,18 +761,16 @@ int game_loop (void) {
 	player.x = save_player.x = 14;
 	player.y = save_player.y = 10;
 	
-	scroll.x = scroll.y = 0;
+	//scroll.x = scroll.y = 0;
 	
 	load_map (nivel, mapa, frames, &goal, random, FALSE, warps, &movible, &warp_enable, &map_size);
-	scroll.x = map_size.x;
-	scroll.y = map_size.y;
-	
+	scroll.x = mapa_1_min_mapx;
+	scroll.y = mapa_1_min_mapy;
+	int slow = FALSE;
 	while (aptMainLoop () && !done) {
 		last_time = svcGetSystemTick ();
 		hidScanInput ();
-		keys = hidKeysHeld ();
-		
-		last_key = 0;
+		keys = hidKeysDown ();
 		
 		if (keys & KEY_START) {
 			done = GAME_QUIT;
@@ -784,6 +782,20 @@ int game_loop (void) {
 			last_key |= LEFT;
 		} else if (keys & KEY_RIGHT) {
 			last_key |= RIGHT;
+		} else if (keys & KEY_A) {
+			slow = !slow;
+		}
+		
+		keys = hidKeysUp ();
+		
+		if (keys & KEY_UP) {
+			last_key &= ~UP;
+		} else if (keys & KEY_DOWN) {
+			last_key &= ~DOWN;
+		} else if (keys & KEY_LEFT) {
+			last_key &= ~LEFT;
+		} else if (keys & KEY_RIGHT) {
+			last_key &= ~RIGHT;
 		}
 		
 		tile_actual = &mapa[player.y][player.x];
@@ -1108,6 +1120,7 @@ int game_loop (void) {
 				abc.y = 20 + ((h - scroll.x) * TILE_WIDTH) + sub_scroll_x;
 				abc.x = 240 - (12 + ((g - scroll.y) * TILE_HEIGHT) + TILE_HEIGHT + sub_scroll_y);
 				if (g < 0 || h < 0 || g >= 15 || h >= 19) {
+					/* Espacio en blanco fuera del área de juego */
 					copy_tile (GFX_TOP, GFX_LEFT, &abc, tiles_outputs[tiles_start[1]]);
 				} else {
 					frames[g][h] = tiles_frames[frames[g][h]];
@@ -1136,6 +1149,9 @@ int game_loop (void) {
 				if (next_player.x - scroll.x < 0 || next_player.y - scroll.y < 0 || next_player.y - scroll.y >= 9 || next_player.x - scroll.x >= 15) {
 					scroll.x += (next_player.x - player.x);
 					scroll.y += (next_player.y - player.y);
+					
+					/* Quitar el subscroll para la caja */
+					sub_scroll_x = sub_scroll_y = 0;
 				}
 				player.x = next_player.x;
 				player.y = next_player.y;
@@ -1215,12 +1231,12 @@ int game_loop (void) {
 		if (slide_moving > 0) {
 			slide_moving--;
 			
-			abc.y = 20 + (movible.x * TILE_WIDTH) + ((old_movible.x - movible.x) * 8 * slide_moving);
-			abc.x = 240 - (12 + (movible.y * TILE_HEIGHT) + ((old_movible.y - movible.y) * 8 * slide_moving) + TILE_HEIGHT);
+			abc.y = 20 + ((movible.x - scroll.x) * TILE_WIDTH) + ((old_movible.x - movible.x) * 8 * slide_moving) + sub_scroll_x;
+			abc.x = 240 - (12 + ((movible.y - scroll.y) * TILE_HEIGHT) + ((old_movible.y - movible.y) * 8 * slide_moving) + TILE_HEIGHT + sub_scroll_y);
 			copy_tile (GFX_TOP, GFX_LEFT, &abc, TILE_BLOCK);
 		} else if (movible.x != -1) {
-			abc.y = 20 + (movible.x * TILE_WIDTH);
-			abc.x = 240 - (12 + (movible.y * TILE_HEIGHT) + TILE_HEIGHT);
+			abc.y = 20 + ((movible.x - scroll.x) * TILE_WIDTH) + sub_scroll_x;
+			abc.x = 240 - (12 + ((movible.y - scroll.y) * TILE_HEIGHT) + TILE_HEIGHT + sub_scroll_y);
 			copy_tile (GFX_TOP, GFX_LEFT, &abc, TILE_BLOCK);
 		}
 		
@@ -1232,7 +1248,11 @@ int game_loop (void) {
 		
 		now_time = svcGetSystemTick ();
 		if (now_time < last_time + FPS) svcSleepThread (last_time + FPS - now_time);
-		
+		if (slow) {
+			for (g = 0; g < 18; g++) {
+				svcSleepThread (last_time + FPS - now_time);
+			}
+		}
 		if (player_die && puffle_frame >= 92) {
 			tiles_flipped = 0;
 			snow_melted = 0;
