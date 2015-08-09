@@ -613,6 +613,12 @@ enum {
 	RIGHT = 0x08
 };
 
+enum {
+	SCROLL_NONE = 0,
+	SCROLL_MANUAL,
+	SCROLL_FREE
+};
+
 /* Estructuras */
 typedef struct {
 	int x, y;
@@ -743,6 +749,7 @@ int game_loop (void) {
 	Punto scroll;
 	SDL_Rect map_size;
 	int arcade_button_left = 0, arcade_button_right = 0, arcade_button_up = 0, arcade_button_down = 0;
+	int scroll_mode = SCROLL_NONE, scroll_dir;
 	
 	tiles_flipped = save_tiles_flipped = snow_melted = save_snow_melted = 0;
 	solved_points = bonus_point = save_bonus_point = solved_stages = 0;
@@ -761,7 +768,7 @@ int game_loop (void) {
 	player.x = save_player.x = 14;
 	player.y = save_player.y = 10;
 	
-	//scroll.x = scroll.y = 0;
+	sub_scroll_x = sub_scroll_y = 0;
 	
 	load_map (nivel, mapa, frames, &goal, random, FALSE, warps, &movible, &warp_enable, &map_size);
 	scroll.x = mapa_1_min_mapx;
@@ -782,8 +789,21 @@ int game_loop (void) {
 			last_key |= LEFT;
 		} else if (keys & KEY_RIGHT) {
 			last_key |= RIGHT;
-		} else if (keys & KEY_A) {
+		} else if (keys & KEY_SELECT) {
 			slow = !slow;
+		} else if (keys & KEY_A && player_moving == 0) {
+			/* Iniciar un movimiento de scroll manual hacia abajo */
+			scroll_mode = SCROLL_MANUAL;
+			scroll_dir = RIGHT;
+		} else if (keys & KEY_B && player_moving == 0) {
+			scroll_mode = SCROLL_MANUAL;
+			scroll_dir = DOWN;
+		} else if (keys & KEY_Y && player_moving == 0) {
+			scroll_mode = SCROLL_MANUAL;
+			scroll_dir = LEFT;
+		} else if (keys & KEY_X && player_moving == 0) {
+			scroll_mode = SCROLL_MANUAL;
+			scroll_dir = UP;
 		}
 		
 		keys = hidKeysUp ();
@@ -1031,7 +1051,7 @@ int game_loop (void) {
 			//earn_stamp (c, 66);
 		}
 		
-		if (player_moving == 0) {
+		if (scroll_mode == SCROLL_NONE && player_moving == 0) {
 			if (last_key & DOWN && !wall_down) {
 				next_player.y = player.y + 1;
 				next_player.x = player.x;
@@ -1103,7 +1123,38 @@ int game_loop (void) {
 			}
 		}
 		
-		if (player_moving > 0 && (next_player.x - scroll.x < 0 || next_player.y - scroll.y < 0 || next_player.y - scroll.y >= 9 || next_player.x - scroll.x >= 15)) {
+		if (scroll_mode == SCROLL_MANUAL) {
+			/* Desplazar las cosas */
+			if (scroll_dir == UP) {
+				sub_scroll_y += 8;
+				if (sub_scroll_y == 24) {
+					scroll_mode = SCROLL_NONE;
+					sub_scroll_y = 0;
+					scroll.y--;
+				}
+			} else if (scroll_dir == DOWN) {
+				sub_scroll_y -= 8;
+				if (sub_scroll_y == -24) {
+					scroll_mode = SCROLL_NONE;
+					sub_scroll_y = 0;
+					scroll.y++;
+				}
+			} else if (scroll_dir == LEFT) {
+				sub_scroll_x += 8;
+				if (sub_scroll_x == 24) {
+					scroll_mode = SCROLL_NONE;
+					sub_scroll_x = 0;
+					scroll.x--;
+				}
+			} else if (scroll_dir == RIGHT) {
+				sub_scroll_x -= 8;
+				if (sub_scroll_x == -24) {
+					scroll_mode = SCROLL_NONE;
+					sub_scroll_x = 0;
+					scroll.x++;
+				}
+			}
+		} else if (player_moving > 0 && (next_player.x - scroll.x < 0 || next_player.y - scroll.y < 0 || next_player.y - scroll.y >= 9 || next_player.x - scroll.x >= 15)) {
 			sub_scroll_x = (player.x - next_player.x) * 8 * (4 - player_moving);
 			sub_scroll_y = (player.y - next_player.y) * 8 * (4 - player_moving);
 			//printf ("Sub scroll X, Y = %i, %i\n", sub_scroll_x, sub_scroll_y);
@@ -1158,8 +1209,8 @@ int game_loop (void) {
 			}
 		} else {
 			//printf ("P: (%i, %i), S: (%i, %i), F: %i, %i\n", player.x, player.y, scroll.x, scroll.y, (player.x - scroll.x), (player.y - scroll.y));
-			abc.y = 20 + ((player.x - scroll.x) * TILE_WIDTH);
-			abc.x = 240 - (12 + ((player.y - scroll.y) * TILE_HEIGHT) + TILE_HEIGHT);
+			abc.y = 20 + ((player.x - scroll.x) * TILE_WIDTH) + sub_scroll_x;
+			abc.x = 240 - (12 + ((player.y - scroll.y) * TILE_HEIGHT) + TILE_HEIGHT + sub_scroll_y);
 		}
 		
 		//-36, 356
