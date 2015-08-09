@@ -45,6 +45,15 @@
 #include "mapa8.h"
 #include "mapa9.h"
 #include "mapa10.h"
+#include "mapa11.h"
+#include "mapa12.h"
+#include "mapa13.h"
+#include "mapa14.h"
+#include "mapa15.h"
+#include "mapa16.h"
+#include "mapa17.h"
+#include "mapa18.h"
+#include "mapa19.h"
 
 #include "tiles_bgra.h"
 
@@ -53,7 +62,7 @@
 
 #define TILE_MAP_WIDTH 528
 
-#define FPS (268123480/2)
+#define FPS (268123480/6)
 
 #define RANDOM(x) ((int) (x ## .0 * rand () / (RAND_MAX + 1.0)))
 
@@ -618,6 +627,7 @@ typedef struct {
 void setup (void);
 int game_loop (void);
 void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, int last_solved, Warp *warps, Punto *movible, int *warp_enable, SDL_Rect *map_size);
+void area_secreta (int (*mapa)[19], int (*frames)[19], int solved_stages);
 
 /* Globales */
 int first_try_count, solved_stages, save_bonus_point, save_tiles_flipped, score, timepoints = 0;
@@ -850,9 +860,8 @@ int game_loop (void) {
 			wall_right = FALSE;
 		}
 		
-		/*
 		if (warps[0].x == player.x && warps[0].y == player.y && warp_enable && player_moving == 0) {
-			if (use_sound) Mix_PlayChannel (-1, sounds[SND_WARP], 0);
+			//if (use_sound) Mix_PlayChannel (-1, sounds[SND_WARP], 0);
 			wall_up = wall_down = wall_left = wall_right = TRUE;
 			player.x = warps[1].x;
 			player.y = warps[1].y;
@@ -861,7 +870,7 @@ int game_loop (void) {
 			warp_enable = FALSE;
 			warp_wall = FALSE;
 		} else if (warps[1].x == player.x && warps[1].y == player.y && warp_enable && player_moving == 0) {
-			if (use_sound) Mix_PlayChannel (-1, sounds[SND_WARP], 0);
+			//if (use_sound) Mix_PlayChannel (-1, sounds[SND_WARP], 0);
 			wall_up = wall_down = wall_left = wall_right = TRUE;
 			player.x = warps[0].x;
 			player.y = warps[0].y;
@@ -873,11 +882,10 @@ int game_loop (void) {
 			// Matar al puffle
 			puffle_frame = player_start[PLAYER_DROWN];
 			player_die = TRUE;
-			if (use_sound) Mix_PlayChannel (-1, sounds[SND_DROWN], 0);
+			//if (use_sound) Mix_PlayChannel (-1, sounds[SND_DROWN], 0);
 			mapa[player.y][player.x] = 12;
 			frames[player.y][player.x] = tiles_start[12];
 		}
-		*/
 		
 		/* Verificar colisiones de la caja */
 		if (mapa[movible.y - 1][movible.x] >= 20) {
@@ -992,7 +1000,6 @@ int game_loop (void) {
 			random = RANDOM(2);
 			tries = 1;
 			if (nivel != 20) {
-				/* FIXME: Temporal */
 				load_map (nivel, mapa, frames, &goal, random, last_solved, warps, &movible, &warp_enable, &map_size);
 				warp_wall = warp_enable;
 			} else {
@@ -1007,7 +1014,7 @@ int game_loop (void) {
 			/* Actualizar el texto del goal */
 			//sprintf (buf, "%i", goal);
 		} else if (*tile_actual == 14) {
-			//area_secreta (mapa, frames, solved_stages);
+			area_secreta (mapa, frames, solved_stages);
 			//if (use_sound) Mix_PlayChannel (-1, sounds[SND_WARP], 0);
 			//earn_stamp (c, 66);
 		}
@@ -1085,24 +1092,28 @@ int game_loop (void) {
 		}
 		
 		if (player_moving > 0 && (next_player.x - scroll.x < 0 || next_player.y - scroll.y < 0 || next_player.y - scroll.y >= 9 || next_player.x - scroll.x >= 15)) {
-			sub_scroll_x = (player.x - next_player.x) * 8 * (player_moving - 1);
-			sub_scroll_y = (player.y - next_player.y) * 8 * (player_moving - 1);
+			sub_scroll_x = (player.x - next_player.x) * 8 * (4 - player_moving);
+			sub_scroll_y = (player.y - next_player.y) * 8 * (4 - player_moving);
+			//printf ("Sub scroll X, Y = %i, %i\n", sub_scroll_x, sub_scroll_y);
 		} else {
 			sub_scroll_x = sub_scroll_y = 0;
 		}
 		
 		/* Dibujado del mapa */
 		//printf ("Scroll: (%i, %i). Map: (%i, %i) WH: (%i, %i)\nG: ", scroll.x, scroll.y, map_size.x, map_size.y, map_size.w, map_size.h);
-		for (g = scroll.y; g < scroll.y + 9 && g < 15; g++) {
+		for (g = scroll.y - 2; g < scroll.y + 11; g++) {
 			//printf ("%i, H: ", g);
-			for (h = scroll.x; h < scroll.x + 15 && h < 19; h++) {
+			for (h = scroll.x - 2; h < scroll.x + 17; h++) {
 				//printf ("%i ", h);
-				frames[g][h] = tiles_frames[frames[g][h]];
-				
 				abc.y = 20 + ((h - scroll.x) * TILE_WIDTH) + sub_scroll_x;
 				abc.x = 240 - (12 + ((g - scroll.y) * TILE_HEIGHT) + TILE_HEIGHT + sub_scroll_y);
+				if (g < 0 || h < 0 || g >= 15 || h >= 19) {
+					copy_tile (GFX_TOP, GFX_LEFT, &abc, tiles_outputs[tiles_start[1]]);
+				} else {
+					frames[g][h] = tiles_frames[frames[g][h]];
 				
-				copy_tile (GFX_TOP, GFX_LEFT, &abc, tiles_outputs [frames[g][h]]);
+					copy_tile (GFX_TOP, GFX_LEFT, &abc, tiles_outputs [frames[g][h]]);
+				}
 			}
 			//printf ("Fin del H\n");
 		}
@@ -1111,8 +1122,14 @@ int game_loop (void) {
 		if (player_moving > 0) {
 			player_moving--;
 			
-			abc.y = 20 + ((next_player.x - scroll.x) * TILE_WIDTH) + ((player.x - next_player.x) * 8 * player_moving);
-			abc.x = 240 - (12 + ((next_player.y - scroll.y) * TILE_HEIGHT) + ((player.y - next_player.y) * 8 * player_moving) + TILE_HEIGHT);
+			/* Si el jugador se mueve hacia una orilla que provoque scroll, no moverlo */
+			if (next_player.x - scroll.x < 0 || next_player.y - scroll.y < 0 || next_player.y - scroll.y >= 9 || next_player.x - scroll.x >= 15) {
+				abc.y = 20 + ((player.x - scroll.x) * TILE_WIDTH);
+				abc.x = 240 - (12 + ((player.y - scroll.y) * TILE_HEIGHT) + TILE_HEIGHT);
+			} else {
+				abc.y = 20 + ((next_player.x - scroll.x) * TILE_WIDTH) + ((player.x - next_player.x) * 8 * player_moving);
+				abc.x = 240 - (12 + ((next_player.y - scroll.y) * TILE_HEIGHT) + ((player.y - next_player.y) * 8 * player_moving) + TILE_HEIGHT);
+			}
 			
 			if (player_moving == 0) {
 				/* Si el jugador se movió a una orilla, mover la ventana de scroll */
@@ -1134,9 +1151,9 @@ int game_loop (void) {
 		puffle_frame = player_frames [puffle_frame];
 		copy_tile (GFX_TOP, GFX_LEFT, &abc, player_outputs[puffle_frame]);
 		
-		//if (player_die && puffle_frame >= player_start[PLAYER_DROWN] && puffle_frame < player_start[PLAYER_DROWN] + 19) {
+		if (player_die && puffle_frame >= player_start[PLAYER_DROWN] && puffle_frame < player_start[PLAYER_DROWN] + 19) {
 			/* Pegar el humo que sale */
-		//}
+		}
 		
 		/* Colisiones de la caja contra el portal, luego continuar su movimiento */
 		if (movible.x == warps[0].x && movible.y == warps[0].y && warp_wall && slide_moving == 0) {
@@ -1215,6 +1232,24 @@ int game_loop (void) {
 		
 		now_time = svcGetSystemTick ();
 		if (now_time < last_time + FPS) svcSleepThread (last_time + FPS - now_time);
+		
+		if (player_die && puffle_frame >= 92) {
+			tiles_flipped = 0;
+			snow_melted = 0;
+			bonus_point = 0;
+			tries++;
+			player.y = save_player.y;
+			player.x = save_player.x;
+			puffle_frame = player_start [PLAYER_IGNITE];
+			slide_block = llave = 0;
+			load_map (nivel, mapa, frames, &goal, random, last_solved, warps, &movible, &warp_enable, &map_size);
+			warp_wall = warp_enable;
+			player_die = FALSE;
+			//if (use_sound) Mix_PlayChannel (-1, sounds[SND_START], 0);
+			
+			/* Actualizar los tiles flipped */
+			//text = TTF_RenderUTF8_Blended (ttf13_burbank_bold, "0", azul);
+		}
 	}
 	
 	return done;
@@ -1291,10 +1326,10 @@ void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, 
 				copiar = mapa_5_2;
 			}
 			*goal = mapa_5_goal;
-			/*map_size->x = mapa_5_min_mapx;
+			map_size->x = mapa_5_min_mapx;
 			map_size->y = mapa_5_min_mapy;
 			map_size->w = mapa_5_max_mapw;
-			map_size->h = mapa_5_max_maph;*/
+			map_size->h = mapa_5_max_maph;
 			break;
 		case 6:
 			if (r) {
@@ -1303,10 +1338,10 @@ void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, 
 				copiar = mapa_6_2;
 			}
 			*goal = mapa_6_goal;
-			/*map_size->x = mapa_6_min_mapx;
+			map_size->x = mapa_6_min_mapx;
 			map_size->y = mapa_6_min_mapy;
 			map_size->w = mapa_6_max_mapw;
-			map_size->h = mapa_6_max_maph;*/
+			map_size->h = mapa_6_max_maph;
 			break;
 		case 7:
 			if (r) {
@@ -1315,10 +1350,10 @@ void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, 
 				copiar = mapa_7_2;
 			}
 			*goal = mapa_7_goal;
-			/*map_size->x = mapa_7_min_mapx;
+			map_size->x = mapa_7_min_mapx;
 			map_size->y = mapa_7_min_mapy;
 			map_size->w = mapa_7_max_mapw;
-			map_size->h = mapa_7_max_maph;*/
+			map_size->h = mapa_7_max_maph;
 			break;
 		case 8:
 			if (r) {
@@ -1327,10 +1362,10 @@ void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, 
 				copiar = mapa_8_2;
 			}
 			*goal = mapa_8_goal;
-			/*map_size->x = mapa_8_min_mapx;
+			map_size->x = mapa_8_min_mapx;
 			map_size->y = mapa_8_min_mapy;
 			map_size->w = mapa_8_max_mapw;
-			map_size->h = mapa_8_max_maph;*/
+			map_size->h = mapa_8_max_maph;
 			break;
 		case 9:
 			if (r) {
@@ -1339,10 +1374,10 @@ void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, 
 				copiar = mapa_9_2;
 			}
 			*goal = mapa_9_goal;
-			/*map_size->x = mapa_9_min_mapx;
+			map_size->x = mapa_9_min_mapx;
 			map_size->y = mapa_9_min_mapy;
 			map_size->w = mapa_9_max_mapw;
-			map_size->h = mapa_9_max_maph;*/
+			map_size->h = mapa_9_max_maph;
 			break;
 		case 10:
 			if (r) {
@@ -1351,18 +1386,22 @@ void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, 
 				copiar = mapa_10_2;
 			}
 			*goal = mapa_10_goal;
-			/*map_size->x = mapa_10_min_mapx;
+			map_size->x = mapa_10_min_mapx;
 			map_size->y = mapa_10_min_mapy;
 			map_size->w = mapa_10_max_mapw;
-			map_size->h = mapa_10_max_maph;*/
+			map_size->h = mapa_10_max_maph;
 			break;
-		/*case 11:
+		case 11:
 			if (r) {
 				copiar = mapa_11_1;
 			} else {
 				copiar = mapa_11_2;
 			}
 			*goal = mapa_11_goal;
+			map_size->x = mapa_11_min_mapx;
+			map_size->y = mapa_11_min_mapy;
+			map_size->w = mapa_11_max_mapw;
+			map_size->h = mapa_11_max_maph;
 			break;
 		case 12:
 			if (r) {
@@ -1371,6 +1410,10 @@ void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, 
 				copiar = mapa_12_2;
 			}
 			*goal = mapa_12_goal;
+			map_size->x = mapa_12_min_mapx;
+			map_size->y = mapa_12_min_mapy;
+			map_size->w = mapa_12_max_mapw;
+			map_size->h = mapa_12_max_maph;
 			break;
 		case 13:
 			if (r) {
@@ -1379,6 +1422,11 @@ void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, 
 				copiar = mapa_13_2;
 			}
 			*goal = mapa_13_goal;
+			
+			map_size->x = mapa_13_min_mapx;
+			map_size->y = mapa_13_min_mapy;
+			map_size->w = mapa_13_max_mapw;
+			map_size->h = mapa_13_max_maph;
 			
 			movible->x = 5;
 			movible->y = 9;
@@ -1391,6 +1439,11 @@ void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, 
 			}
 			*goal = mapa_14_goal;
 			
+			map_size->x = mapa_14_min_mapx;
+			map_size->y = mapa_14_min_mapy;
+			map_size->w = mapa_14_max_mapw;
+			map_size->h = mapa_14_max_maph;
+			
 			movible->x = 7;
 			movible->y = 8;
 			break;
@@ -1401,6 +1454,11 @@ void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, 
 				copiar = mapa_15_2;
 			}
 			*goal = mapa_15_goal;
+			
+			map_size->x = mapa_15_min_mapx;
+			map_size->y = mapa_15_min_mapy;
+			map_size->w = mapa_15_max_mapw;
+			map_size->h = mapa_15_max_maph;
 			
 			movible->x = 5;
 			movible->y = 8;
@@ -1413,6 +1471,11 @@ void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, 
 			}
 			*goal = mapa_16_goal;
 			
+			map_size->x = mapa_16_min_mapx;
+			map_size->y = mapa_16_min_mapy;
+			map_size->w = mapa_16_max_mapw;
+			map_size->h = mapa_16_max_maph;
+			
 			movible->x = 14;
 			movible->y = 5;
 			break;
@@ -1423,6 +1486,11 @@ void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, 
 				copiar = mapa_17_2;
 			}
 			*goal = mapa_17_goal;
+			
+			map_size->x = mapa_17_min_mapx;
+			map_size->y = mapa_17_min_mapy;
+			map_size->w = mapa_17_max_mapw;
+			map_size->h = mapa_17_max_maph;
 			
 			movible->x = 5;
 			movible->y = 11;
@@ -1435,6 +1503,11 @@ void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, 
 			}
 			*goal = mapa_18_goal;
 			
+			map_size->x = mapa_18_min_mapx;
+			map_size->y = mapa_18_min_mapy;
+			map_size->w = mapa_18_max_mapw;
+			map_size->h = mapa_18_max_maph;
+			
 			movible->x = 16;
 			movible->y = 10;
 			break;
@@ -1446,14 +1519,19 @@ void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, 
 			}
 			*goal = mapa_19_goal;
 			
+			map_size->x = mapa_19_min_mapx;
+			map_size->y = mapa_19_min_mapy;
+			map_size->w = mapa_19_max_mapw;
+			map_size->h = mapa_19_max_maph;
+			
 			movible->x = 12;
 			movible->y = 7;
-			break;*/
+			break;
 	}
 	
 	memcpy (mapa, copiar, sizeof (int[15][19]));
 	
-	/*if (last_solved) {
+	if (last_solved) {
 		switch (nivel) {
 			case 4:
 				mapa[7][7] = 7;
@@ -1501,7 +1579,7 @@ void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, 
 				mapa[1][17] = 7;
 				break;
 		}
-	}*/
+	}
 	
 	warps[0].x = warps[0].y = warps[1].x = warps[1].y = -1;
 	*warp_enable = FALSE;
@@ -1522,3 +1600,156 @@ void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, 
 		}
 	}
 }
+
+void area_secreta (int (*mapa)[19], int (*frames)[19], int solved_stages) {
+	/* Muro */
+	mapa[2][13] = mapa[11][16] = mapa[11][18] = mapa[10][18] =
+	mapa[9][18] = mapa[8][18] = mapa[7][18] = 20;
+	frames[2][13] = frames[11][16] = frames[11][18] = frames[10][18] =
+	frames[9][18] = frames[8][18] = frames[7][18] = tiles_start[20];
+	
+	/* Hielo */
+	mapa[3][13] = mapa[9][14] = mapa[7][14] = mapa[5][14] = mapa[3][14] =
+	mapa[1][14] = mapa[10][15] = mapa[8][15] = mapa[6][15] = mapa[4][15] =
+	mapa[2][15] = mapa[10][16] = mapa[9][16] = mapa[7][16] = mapa[5][16] =
+	mapa[3][16] = mapa[1][16] = mapa[12][17] = mapa[11][17] = mapa[10][17] =
+	mapa[8][17] = mapa[6][17] = mapa[4][17] = mapa[2][17] = 2;
+	frames[3][13] = frames[9][14] = frames[7][14] = frames[5][14] = frames[3][14] =
+	frames[1][14] = frames[10][15] = frames[8][15] = frames[6][15] = frames[4][15] =
+	frames[2][15] = frames[10][16] = frames[9][16] = frames[7][16] = frames[5][16] =
+	frames[3][16] = frames[1][16] = frames[12][17] = frames[11][17] = frames[10][17] =
+	frames[8][17] = frames[6][17] = frames[4][17] = frames[2][17] = tiles_start[2];
+	
+	/* El boton */
+	mapa[13][17] = 3;
+	frames[13][17] = tiles_start[15];
+	
+	/* Bolsas de dinero */
+	if (solved_stages >= 1) {
+		mapa[8][14] = 7;
+		frames[8][14] = tiles_start[7];
+	} else {
+		mapa[8][14] = 2;
+		frames[8][14] = tiles_start[2];
+	}
+	if (solved_stages >= 2) {
+		mapa[6][14] = 7;
+		frames[6][14] = tiles_start[7];
+	} else {
+		mapa[6][14] = 2;
+		frames[6][14] = tiles_start[2];
+	}
+	if (solved_stages >= 3) {
+		mapa[4][14] = 7;
+		frames[4][14] = tiles_start[7];
+	} else {
+		mapa[4][14] = 2;
+		frames[4][14] = tiles_start[2];
+	}
+	if (solved_stages >= 4) {
+		mapa[2][14] = 7;
+		frames[2][14] = tiles_start[7];
+	} else {
+		mapa[2][14] = 2;
+		frames[2][14] = tiles_start[2];
+	}
+	if (solved_stages >= 9) {
+		mapa[9][15] = 7;
+		frames[9][15] = tiles_start[7];
+	} else {
+		mapa[9][15] = 2;
+		frames[9][15] = tiles_start[2];
+	}
+	if (solved_stages >= 8) {
+		mapa[7][15] = 7;
+		frames[7][15] = tiles_start[7];
+	} else {
+		mapa[7][15] = 2;
+		frames[7][15] = tiles_start[2];
+	}
+	if (solved_stages >= 7) {
+		mapa[5][15] = 7;
+		frames[5][15] = tiles_start[7];
+	} else {
+		mapa[5][15] = 2;
+		frames[5][15] = tiles_start[2];
+	}
+	if (solved_stages >= 6) {
+		mapa[3][15] = 7;
+		frames[3][15] = tiles_start[7];
+	} else {
+		mapa[3][15] = 2;
+		frames[3][15] = tiles_start[2];
+	}
+	if (solved_stages >= 5) {
+		mapa[1][15] = 7;
+		frames[1][15] = tiles_start[7];
+	} else {
+		mapa[1][15] = 2;
+		frames[1][15] = tiles_start[2];
+	}
+	if (solved_stages >= 10) {
+		mapa[8][16] = 7;
+		frames[8][16] = tiles_start[7];
+	} else {
+		mapa[8][16] = 2;
+		frames[8][16] = tiles_start[2];
+	}
+	if (solved_stages >= 11) {
+		mapa[6][16] = 7;
+		frames[6][16] = tiles_start[7];
+	} else {
+		mapa[6][16] = 2;
+		frames[6][16] = tiles_start[2];
+	}
+	if (solved_stages >= 12) {
+		mapa[4][16] = 7;
+		frames[4][16] = tiles_start[7];
+	} else {
+		mapa[4][16] = 2;
+		frames[4][16] = tiles_start[2];
+	}
+	if (solved_stages >= 13) {
+		mapa[2][16] = 7;
+		frames[2][16] = tiles_start[7];
+	} else {
+		mapa[2][16] = 2;
+		frames[2][16] = tiles_start[2];
+	}
+	if (solved_stages >= 18) {
+		mapa[9][17] = 7;
+		frames[9][17] = tiles_start[7];
+	} else {
+		mapa[9][17] = 2;
+		frames[9][17] = tiles_start[2];
+	}
+	if (solved_stages >= 17) {
+		mapa[7][17] = 7;
+		frames[7][17] = tiles_start[7];
+	} else {
+		mapa[7][17] = 2;
+		frames[7][17] = tiles_start[2];
+	}
+	if (solved_stages >= 16) {
+		mapa[5][17] = 7;
+		frames[5][17] = tiles_start[7];
+	} else {
+		mapa[5][17] = 2;
+		frames[5][17] = tiles_start[2];
+	}
+	if (solved_stages >= 15) {
+		mapa[3][17] = 7;
+		frames[3][17] = tiles_start[7];
+	} else {
+		mapa[3][17] = 2;
+		frames[3][17] = tiles_start[2];
+	}
+	if (solved_stages >= 14) {
+		mapa[1][17] = 7;
+		frames[1][17] = tiles_start[7];
+	} else {
+		mapa[1][17] = 2;
+		frames[1][17] = tiles_start[2];
+	}
+}
+

@@ -39,5 +39,10 @@ const int mapa_8_2[15][19] = {
 
 const int mapa_8_goal = 82;
 
+const int mapa_8_max_mapw = 17;
+const int mapa_8_max_maph = 12;
+const int mapa_8_min_mapx = 0;
+const int mapa_8_min_mapy = 3;
+
 #endif /* __MAPA_8_H__ */
 

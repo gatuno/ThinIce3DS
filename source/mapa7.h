@@ -39,5 +39,10 @@ const int mapa_7_2[15][19] = {
 
 const int mapa_7_goal = 66;
 
+const int mapa_7_max_mapw = 18;
+const int mapa_7_max_maph = 11;
+const int mapa_7_min_mapx = 1;
+const int mapa_7_min_mapy = 2;
+
 #endif /* __MAPA_7_H__ */
 
