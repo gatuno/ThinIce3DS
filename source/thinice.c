@@ -35,6 +35,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "sfx.h"
+#include "filesystem.h"
+
 #include "mapa1.h"
 #include "mapa2.h"
 #include "mapa3.h"
@@ -283,6 +286,45 @@ enum {
 	TILE_MELT_43,
 	TILE_MELT_44,
 	TILE_MELT_45
+};
+
+/* Sonidos */
+enum {
+	SND_START,
+	SND_ICE,
+	SND_DOUBLE_ICE,
+	SND_DROWN,
+	SND_MONEY,
+	SND_KEY,
+	SND_MOVE,
+	SND_WARP,
+	SND_COMPLETE,
+	
+	SND_BUTTON,
+	
+	SND_POINTS,
+	SND_1,
+	SND_2,
+	
+	NUM_SOUNDS
+};
+
+const char *sound_names[NUM_SOUNDS] = {
+	"sounds/start.raw",
+	"sounds/ice.raw",
+	"sounds/double.raw",
+	"sounds/drown.raw",
+	"sounds/money.raw",
+	"sounds/key.raw",
+	"sounds/move.raw",
+	"sounds/warp.raw",
+	"sounds/complete.raw",
+	
+	"sounds/button-1.raw",
+	
+	"sounds/points.raw",
+	"sounds/sound_1.raw",
+	"sounds/sound_2.raw"
 };
 
 static int tiles_frames [] = {
@@ -681,13 +723,15 @@ typedef struct {
 } Warp;
 
 /* Prototipos de función */
-void setup (void);
+void setup (int argc, char *argv[]);
 int game_loop (void);
 void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, int last_solved, Warp *warps, Punto *movible, int *warp_enable, SDL_Rect *map_size);
 void area_secreta (int (*mapa)[19], int (*frames)[19], int solved_stages);
 
 /* Globales */
 int first_try_count, solved_stages, save_bonus_point, save_tiles_flipped, score, timepoints = 0;
+
+SFX_s sonidos[NUM_SOUNDS];
 
 void copy_tile (gfxScreen_t screen, gfx3dSide_t side, Punto *rect, int tile) {
 	u16 fbWidth, fbHeight;
@@ -832,15 +876,26 @@ void gfxFillRect (gfxScreen_t screen, gfx3dSide_t side, SDL_Rect *rect, u8 b, u8
 	}
 }
 
-int main (void) {
+int main (int argc, char *argv[]) {
+	int g;
 	
-	setup ();
+	setup (argc, argv);
 	
 	do {
 		//if (game_intro () == GAME_QUIT) break;
 		if (game_loop () == GAME_QUIT) break;
 	} while (1 == 0);
 	
+	/* Liberar los sonidos */
+	for (g = 0; g < NUM_SOUNDS; g++) {
+		freeSFX (&sonidos[g]);
+	}
+	
+	aptOpenSession();
+	APT_SetAppCpuTimeLimit(NULL, 0);
+	aptCloseSession();
+	
+	exitSound ();
 	gfxExit();
 	hidExit();
 	aptExit();
@@ -972,7 +1027,7 @@ int game_loop (void) {
 				llave--;
 				mapa[player.y - 1][player.x] = 2;
 				frames[player.y - 1][player.x] = tiles_start[2];
-				//if (use_sound) Mix_PlayChannel (-1, sounds[SND_KEY], 0);
+				playSFX (&sonidos[SND_KEY]);
 				wall_up = FALSE;
 			}
 		} else if (movible.y + 1 == player.y && movible.x == player.x && movible_wall_up) {
@@ -989,7 +1044,7 @@ int game_loop (void) {
 				llave--;
 				mapa[player.y + 1][player.x] = 2;
 				frames[player.y + 1][player.x] = tiles_start[2];
-				//if (use_sound) Mix_PlayChannel (-1, sounds[SND_KEY], 0);
+				playSFX (&sonidos[SND_KEY]);
 				wall_down = FALSE;
 			}
 		} else if (movible.y - 1 == player.y && movible.x == player.x && movible_wall_down) {
@@ -1006,7 +1061,7 @@ int game_loop (void) {
 				llave--;
 				mapa[player.y][player.x - 1] = 2;
 				frames[player.y][player.x - 1] = tiles_start[2];
-				//if (use_sound) Mix_PlayChannel (-1, sounds[SND_KEY], 0);
+				playSFX (&sonidos[SND_KEY]);
 				wall_left = FALSE;
 			}
 		} else if (movible.y == player.y && movible.x + 1 == player.x && movible_wall_left) {
@@ -1023,7 +1078,7 @@ int game_loop (void) {
 				llave--;
 				mapa[player.y][player.x + 1] = 2;
 				frames[player.y][player.x + 1] = tiles_start[2];
-				//if (use_sound) Mix_PlayChannel (-1, sounds[SND_KEY], 0);
+				playSFX (&sonidos[SND_KEY]);
 				wall_right = FALSE;
 			}
 		} else if (movible.y == player.y && movible.x - 1 == player.x && movible_wall_right) {
@@ -1033,7 +1088,7 @@ int game_loop (void) {
 		}
 		
 		if (warps[0].x == player.x && warps[0].y == player.y && warp_enable && player_moving == 0) {
-			//if (use_sound) Mix_PlayChannel (-1, sounds[SND_WARP], 0);
+			playSFX (&sonidos[SND_WARP]);
 			wall_up = wall_down = wall_left = wall_right = TRUE;
 			player.x = warps[1].x;
 			player.y = warps[1].y;
@@ -1064,7 +1119,7 @@ int game_loop (void) {
 				return_scroll.y = scroll.y;
 			}
 		} else if (warps[1].x == player.x && warps[1].y == player.y && warp_enable && player_moving == 0) {
-			//if (use_sound) Mix_PlayChannel (-1, sounds[SND_WARP], 0);
+			playSFX (&sonidos[SND_WARP]);
 			wall_up = wall_down = wall_left = wall_right = TRUE;
 			player.x = warps[0].x;
 			player.y = warps[0].y;
@@ -1098,7 +1153,7 @@ int game_loop (void) {
 			// Matar al puffle
 			puffle_frame = player_start[PLAYER_DROWN];
 			player_die = TRUE;
-			//if (use_sound) Mix_PlayChannel (-1, sounds[SND_DROWN], 0);
+			playSFX (&sonidos[SND_DROWN]);
 			mapa[player.y][player.x] = 12;
 			frames[player.y][player.x] = tiles_start[12];
 		}
@@ -1147,7 +1202,7 @@ int game_loop (void) {
 			frames[player.y][player.x] = tiles_start[2];
 			bonus_point++;
 			
-			//if (use_sound) Mix_PlayChannel (-1, sounds[SND_MONEY], 0);
+			playSFX (&sonidos[SND_MONEY]);
 			
 			/*int suma_bolsas = save_bonus_point + bonus_point;
 			if (suma_bolsas == 1) {
@@ -1165,17 +1220,17 @@ int game_loop (void) {
 			mapa[player.y][player.x] = 3;
 			frames[player.y][player.x] = tiles_start[3];
 			llave++;
-			//if (use_sound) Mix_PlayChannel (-1, sounds[SND_KEY], 0);
+			playSFX (&sonidos[SND_KEY]);
 		} else if (*tile_actual == 9) {
 			mapa[player.y][player.x] = 4;
 			frames[player.y][player.x] = tiles_start[4];
 			llave++;
-			//if (use_sound) Mix_PlayChannel (-1, sounds[SND_KEY], 0);
+			playSFX (&sonidos[SND_KEY]);
 		} else if (*tile_actual == 6) {
 			mapa[player.y][player.x] = 2;
 			frames[player.y][player.x] = tiles_start[2];
 			llave++;
-			//if (use_sound) Mix_PlayChannel (-1, sounds[SND_KEY], 0);
+			playSFX (&sonidos[SND_KEY]);
 		} else if (*tile_actual == 5 && player_moving == 0 && nivel < 20) {
 			save_player.x = player.x;
 			save_player.y = player.y;
@@ -1192,7 +1247,7 @@ int game_loop (void) {
 				
 				/* Actualizar la cantidad de stages resueltos */
 				
-				//if (nivel != 19) if (use_sound) Mix_PlayChannel (-1, sounds[SND_COMPLETE], 0);
+				if (nivel != 19) playSFX (&sonidos[SND_COMPLETE]);
 				if (tries == 1) {
 					first_try_points += tiles_flipped;
 					first_try_count++;
@@ -1231,7 +1286,7 @@ int game_loop (void) {
 			//sprintf (buf, "%i", goal);
 		} else if (*tile_actual == 14) {
 			area_secreta (mapa, frames, solved_stages);
-			//if (use_sound) Mix_PlayChannel (-1, sounds[SND_WARP], 0);
+			playSFX (&sonidos[SND_WARP]);
 			//earn_stamp (c, 66);
 		}
 		
@@ -1245,7 +1300,7 @@ int game_loop (void) {
 				if (movible.x == player.x && movible.y - 1 == player.y && !movible_wall_down && slide_block == 0) {
 					/* Empujar el bloque hacia abajo */
 					slide_block = DOWN;
-					//if (use_sound) Mix_PlayChannel (-1, sounds[SND_MOVE], 0);
+					playSFX (&sonidos[SND_MOVE]);
 				}
 			} else if (last_key & UP && !wall_up) {
 				next_player.y = player.y - 1;
@@ -1256,7 +1311,7 @@ int game_loop (void) {
 				if (movible.x == player.x && movible.y + 1 == player.y && !movible_wall_up && slide_block == 0) {
 					/* Empujar el bloque hacia arriba */
 					slide_block = UP;
-					//if (use_sound) Mix_PlayChannel (-1, sounds[SND_MOVE], 0);
+					playSFX (&sonidos[SND_MOVE]);
 				}
 			} else if (last_key & LEFT && !wall_left) {
 				next_player.y = player.y;
@@ -1267,7 +1322,7 @@ int game_loop (void) {
 				if (movible.x + 1 == player.x && movible.y == player.y && !movible_wall_left && slide_block == 0) {
 					/* Empujar el bloque hacia arriba */
 					slide_block = LEFT;
-					//if (use_sound) Mix_PlayChannel (-1, sounds[SND_MOVE], 0);
+					playSFX (&sonidos[SND_MOVE]);
 				}
 			} else if (last_key & RIGHT && !wall_right) {
 				next_player.y = player.y;
@@ -1278,7 +1333,7 @@ int game_loop (void) {
 				if (movible.x - 1 == player.x && movible.y == player.y && !movible_wall_right && slide_block == 0) {
 					/* Empujar el bloque hacia arriba */
 					slide_block = RIGHT;
-					//if (use_sound) Mix_PlayChannel (-1, sounds[SND_MOVE], 0);
+					playSFX (&sonidos[SND_MOVE]);
 				}
 			}
 			
@@ -1288,7 +1343,7 @@ int game_loop (void) {
 					frames[player.y][player.x] = tiles_start [22];
 					tiles_flipped++;
 					snow_melted++;
-					//if (use_sound) Mix_PlayChannel (0, sounds[SND_ICE], 0);
+					playSFX (&sonidos[SND_ICE]);
 					/*if (save_snow_melted + snow_melted == 480) {
 						earn_stamp (c, 68);
 					}*/
@@ -1299,7 +1354,7 @@ int game_loop (void) {
 					mapa[player.y][player.x] = 2;
 					frames[player.y][player.x] = tiles_start [2];
 					tiles_flipped++;
-					//if (use_sound) Mix_PlayChannel (0, sounds[SND_DOUBLE_ICE], 0);
+					playSFX (&sonidos[SND_DOUBLE_ICE]);
 					
 					/* Actualizar los tiles flipped */
 					//sprintf (buf, "%i", tiles_flipped);
@@ -1562,7 +1617,7 @@ int game_loop (void) {
 			load_map (nivel, mapa, frames, &goal, random, last_solved, warps, &movible, &warp_enable, &map_size);
 			warp_wall = warp_enable;
 			player_die = FALSE;
-			//if (use_sound) Mix_PlayChannel (-1, sounds[SND_START], 0);
+			playSFX (&sonidos[SND_START]);
 			
 			/* Actualizar los tiles flipped */
 			//text = TTF_RenderUTF8_Blended (ttf13_burbank_bold, "0", azul);
@@ -1593,7 +1648,9 @@ int game_loop (void) {
 	return done;
 }
 
-void setup (void) {
+void setup (int argc, char *argv[]) {
+	int g;
+	
 	/* Inicializar 3DS */
 	srvInit();
 	aptInit();
@@ -1602,7 +1659,18 @@ void setup (void) {
 	gfxSet3D(0);
 	gfxSetDoubleBuffering (GFX_BOTTOM, 1);
 	
+	aptOpenSession();
+	APT_SetAppCpuTimeLimit(NULL, 30);
+	aptCloseSession();
+	
+	filesystemInit(argc, argv);
 	//consoleInit(GFX_BOTTOM, NULL);
+	
+	initSound ();
+	/* Cargar todos los sonidos */
+	for (g = 0; g < NUM_SOUNDS; g++) {
+		loadSFX (&sonidos[g], sound_names[g], SOUND_FORMAT_16BIT);
+	}
 }
 
 void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, int last_solved, Warp *warps, Punto *movible, int *warp_enable, SDL_Rect *map_size) {
