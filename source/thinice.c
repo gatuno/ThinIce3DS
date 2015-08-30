@@ -616,7 +616,8 @@ enum {
 enum {
 	SCROLL_NONE = 0,
 	SCROLL_MANUAL,
-	SCROLL_FREE
+	SCROLL_FREE,
+	SCROLL_RETURN
 };
 
 /* Estructuras */
@@ -664,23 +665,16 @@ void copy_tile (gfxScreen_t screen, gfx3dSide_t side, Punto *rect, int tile) {
 	widthDrawn -= xOffset;
 	heightDrawn -= yOffset;
 	
-	//printf ("Offset: (%i, %i). Drawn: (%i, %i)\n", xOffset, yOffset, widthDrawn, heightDrawn);
-	
-	//printf ("Base: %p\n", tiles_bgra);
 	fbAdr += (rect->y + yOffset) * fbWidth * 3;
 	/* Calcular la y del tile */
 	j = ((tile % 8) * TILE_HEIGHT) + yOffset;
 	tile_data = tiles_bgra + (j * TILE_MAP_WIDTH * 4); /* Imagen ARGB */
 	i = (21 - (tile / 8)) * TILE_WIDTH;
-	//printf ("TILE: %i: Y, X de los tiles: %i, %i\n", tile, j, i);
-	//printf ("Tile_data antes : %p\n", tile_data);
 	tile_data += i * 4;
-	//printf ("Tile_data after : %p\n", tile_data);
 	
 	for (j = yOffset; j < yOffset + heightDrawn; j++) {
 		fbd = &fbAdr[(rect->x + xOffset) * 3];
 		data = &tile_data[xOffset * 4]; /* La imagen es ABGR */
-		//printf ("D: %p ", data);
 		for (i = xOffset; i < xOffset + widthDrawn; i++, fbd += 3, data += 4) {
 			alpha = data[3];
 			if (alpha == 0) continue; /* 255 = Opaco, 0 = Trans */
@@ -712,7 +706,6 @@ int main (void) {
 
 int game_loop (void) {
 	int done = 0;
-	SDL_Rect rect;
 	u64 last_time, now_time;
 	int g, h;
 	u32 keys;
@@ -746,7 +739,7 @@ int game_loop (void) {
 	Warp warps[2];
 	int sub_scroll_x, sub_scroll_y;
 	
-	Punto scroll;
+	Punto scroll, return_scroll;
 	SDL_Rect map_size;
 	int arcade_button_left = 0, arcade_button_right = 0, arcade_button_up = 0, arcade_button_down = 0;
 	int scroll_mode = SCROLL_NONE, scroll_dir;
@@ -765,14 +758,14 @@ int game_loop (void) {
 	last_key = 0;
 	score = tally = 0;
 	
-	player.x = save_player.x = 14;
-	player.y = save_player.y = 10;
+	player.x = save_player.x = 14; // 14
+	player.y = save_player.y = 10; // 10
 	
 	sub_scroll_x = sub_scroll_y = 0;
 	
 	load_map (nivel, mapa, frames, &goal, random, FALSE, warps, &movible, &warp_enable, &map_size);
-	scroll.x = mapa_1_min_mapx;
-	scroll.y = mapa_1_min_mapy;
+	scroll.x = map_size.x;
+	scroll.y = map_size.y;
 	int slow = FALSE;
 	while (aptMainLoop () && !done) {
 		last_time = svcGetSystemTick ();
@@ -791,19 +784,21 @@ int game_loop (void) {
 			last_key |= RIGHT;
 		} else if (keys & KEY_SELECT) {
 			slow = !slow;
-		} else if (keys & KEY_A && player_moving == 0) {
-			/* Iniciar un movimiento de scroll manual hacia abajo */
-			scroll_mode = SCROLL_MANUAL;
-			scroll_dir = RIGHT;
-		} else if (keys & KEY_B && player_moving == 0) {
-			scroll_mode = SCROLL_MANUAL;
-			scroll_dir = DOWN;
-		} else if (keys & KEY_Y && player_moving == 0) {
-			scroll_mode = SCROLL_MANUAL;
-			scroll_dir = LEFT;
-		} else if (keys & KEY_X && player_moving == 0) {
-			scroll_mode = SCROLL_MANUAL;
-			scroll_dir = UP;
+		}
+		if (player_moving == 0 && scroll_mode == SCROLL_NONE) {
+			if (keys & KEY_A && scroll.x + 1 <= (map_size.x + map_size.w - 15) && player.x >= scroll.x + 1) {
+				scroll_mode = SCROLL_MANUAL;
+				scroll_dir = RIGHT;
+			} else if (keys & KEY_B && scroll.y + 1 <= (map_size.y + map_size.h - 9) && player.y >= scroll.y + 1) {
+				scroll_mode = SCROLL_MANUAL;
+				scroll_dir = DOWN;
+			} else if (keys & KEY_Y && scroll.x - 1 >= map_size.x && player.x < scroll.x - 1 + 15) {
+				scroll_mode = SCROLL_MANUAL;
+				scroll_dir = LEFT;
+			} else if (keys & KEY_X && scroll.y - 1 >= map_size.y && player.y < scroll.y - 1 + 9) {
+				scroll_mode = SCROLL_MANUAL;
+				scroll_dir = UP;
+			}
 		}
 		
 		keys = hidKeysUp ();
@@ -901,6 +896,28 @@ int game_loop (void) {
 			*warps[1].frame = tiles_start [11];
 			warp_enable = FALSE;
 			warp_wall = FALSE;
+			
+			/* Mover la ventana de scroll */
+			if (scroll.x + 15 <= player.x) {
+				/* Ejecutar un scroll automático */
+				scroll_mode = SCROLL_RETURN;
+				return_scroll.x = player.x - 15 + 1;
+			} else if (player.x < scroll.x) {
+				scroll_mode = SCROLL_RETURN;
+				return_scroll.x = player.x;
+			} else {
+				return_scroll.x = scroll.x;
+			}
+			
+			if (scroll.y + 9 <= player.y) {
+				scroll_mode = SCROLL_RETURN;
+				return_scroll.y = player.y - 9 + 1;
+			} else if (player.y < scroll.y) {
+				scroll_mode = SCROLL_RETURN;
+				return_scroll.y = player.y;
+			} else {
+				return_scroll.y = scroll.y;
+			}
 		} else if (warps[1].x == player.x && warps[1].y == player.y && warp_enable && player_moving == 0) {
 			//if (use_sound) Mix_PlayChannel (-1, sounds[SND_WARP], 0);
 			wall_up = wall_down = wall_left = wall_right = TRUE;
@@ -910,6 +927,28 @@ int game_loop (void) {
 			*warps[1].frame = tiles_start [11];
 			warp_enable = FALSE;
 			warp_wall = FALSE;
+			
+			/* Mover la ventana de scroll */
+			if (scroll.x + 15 <= player.x) {
+				/* Ejecutar un scroll automático */
+				scroll_mode = SCROLL_RETURN;
+				return_scroll.x = player.x - 15 + 1;
+			} else if (player.x < scroll.x) {
+				scroll_mode = SCROLL_RETURN;
+				return_scroll.x = player.x;
+			} else {
+				return_scroll.x = scroll.x;
+			}
+			
+			if (scroll.y + 9 <= player.y) {
+				scroll_mode = SCROLL_RETURN;
+				return_scroll.y = player.y - 9 + 1;
+			} else if (player.y < scroll.y) {
+				scroll_mode = SCROLL_RETURN;
+				return_scroll.y = player.y;
+			} else {
+				return_scroll.y = scroll.y;
+			}
 		} else if (wall_up && wall_down && wall_left && wall_right && player_moving == 0 && *tile_actual != 5 && !player_die) {
 			// Matar al puffle
 			puffle_frame = player_start[PLAYER_DROWN];
@@ -1123,7 +1162,42 @@ int game_loop (void) {
 			}
 		}
 		
-		if (scroll_mode == SCROLL_MANUAL) {
+		if (scroll_mode == SCROLL_RETURN) {
+			/* Obtener una dirección */
+			g = return_scroll.x - scroll.x;
+			if (g < 0) {
+				sub_scroll_x += 8;
+			} else if (g > 0) {
+				sub_scroll_x -= 8;
+			}
+			
+			if (sub_scroll_x == -24) {
+				sub_scroll_x = 0;
+				scroll.x++;
+			} else if (sub_scroll_x == 24) {
+				sub_scroll_x = 0;
+				scroll.x--;
+			}
+			
+			h = return_scroll.y - scroll.y;
+			if (h < 0) {
+				sub_scroll_y += 8;
+			} else if (h > 0) {
+				sub_scroll_y -= 8;
+			}
+			
+			if (sub_scroll_y == -24) {
+				sub_scroll_y = 0;
+				scroll.y++;
+			} else if (sub_scroll_y == 24) {
+				sub_scroll_y = 0;
+				scroll.y--;
+			}
+			
+			if (g == 0 && h == 0) {
+				scroll_mode = SCROLL_NONE;
+			}
+		} else if (scroll_mode == SCROLL_MANUAL) {
 			/* Desplazar las cosas */
 			if (scroll_dir == UP) {
 				sub_scroll_y += 8;
@@ -1157,17 +1231,13 @@ int game_loop (void) {
 		} else if (player_moving > 0 && (next_player.x - scroll.x < 0 || next_player.y - scroll.y < 0 || next_player.y - scroll.y >= 9 || next_player.x - scroll.x >= 15)) {
 			sub_scroll_x = (player.x - next_player.x) * 8 * (4 - player_moving);
 			sub_scroll_y = (player.y - next_player.y) * 8 * (4 - player_moving);
-			//printf ("Sub scroll X, Y = %i, %i\n", sub_scroll_x, sub_scroll_y);
 		} else {
 			sub_scroll_x = sub_scroll_y = 0;
 		}
 		
 		/* Dibujado del mapa */
-		//printf ("Scroll: (%i, %i). Map: (%i, %i) WH: (%i, %i)\nG: ", scroll.x, scroll.y, map_size.x, map_size.y, map_size.w, map_size.h);
 		for (g = scroll.y - 2; g < scroll.y + 11; g++) {
-			//printf ("%i, H: ", g);
 			for (h = scroll.x - 2; h < scroll.x + 17; h++) {
-				//printf ("%i ", h);
 				abc.y = 20 + ((h - scroll.x) * TILE_WIDTH) + sub_scroll_x;
 				abc.x = 240 - (12 + ((g - scroll.y) * TILE_HEIGHT) + TILE_HEIGHT + sub_scroll_y);
 				if (g < 0 || h < 0 || g >= 15 || h >= 19) {
@@ -1179,9 +1249,7 @@ int game_loop (void) {
 					copy_tile (GFX_TOP, GFX_LEFT, &abc, tiles_outputs [frames[g][h]]);
 				}
 			}
-			//printf ("Fin del H\n");
 		}
-		//printf ("Fin del G\n");
 		
 		if (player_moving > 0) {
 			player_moving--;
@@ -1208,13 +1276,10 @@ int game_loop (void) {
 				player.y = next_player.y;
 			}
 		} else {
-			//printf ("P: (%i, %i), S: (%i, %i), F: %i, %i\n", player.x, player.y, scroll.x, scroll.y, (player.x - scroll.x), (player.y - scroll.y));
 			abc.y = 20 + ((player.x - scroll.x) * TILE_WIDTH) + sub_scroll_x;
 			abc.x = 240 - (12 + ((player.y - scroll.y) * TILE_HEIGHT) + TILE_HEIGHT + sub_scroll_y);
 		}
 		
-		//-36, 356
-		//printf ("Player (%i, %i). X, Y = (%i, %i)\n", player.x, player.y, abc.x, abc.y);
 		puffle_frame = player_frames [puffle_frame];
 		copy_tile (GFX_TOP, GFX_LEFT, &abc, player_outputs[puffle_frame]);
 		
@@ -1320,6 +1385,27 @@ int game_loop (void) {
 			
 			/* Actualizar los tiles flipped */
 			//text = TTF_RenderUTF8_Blended (ttf13_burbank_bold, "0", azul);
+			/* Mover la ventana de scroll si es necesario */
+			if (scroll.x + 15 <= player.x) {
+				/* Ejecutar un scroll automático */
+				scroll_mode = SCROLL_RETURN;
+				return_scroll.x = player.x - 15 + 1;
+			} else if (player.x < scroll.x) {
+				scroll_mode = SCROLL_RETURN;
+				return_scroll.x = player.x;
+			} else {
+				return_scroll.x = scroll.x;
+			}
+			
+			if (scroll.y + 9 <= player.y) {
+				scroll_mode = SCROLL_RETURN;
+				return_scroll.y = player.y - 9 + 1;
+			} else if (player.y < scroll.y) {
+				scroll_mode = SCROLL_RETURN;
+				return_scroll.y = player.y;
+			} else {
+				return_scroll.y = scroll.y;
+			}
 		}
 	}
 	
