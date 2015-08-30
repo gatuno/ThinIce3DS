@@ -57,6 +57,22 @@
 
 #include "tiles_bgra.h"
 
+#include "up1_bgra.h"
+#include "up2_bgra.h"
+#include "up3_bgra.h"
+
+#include "down1_bgra.h"
+#include "down2_bgra.h"
+#include "down3_bgra.h"
+
+#include "left1_bgra.h"
+#include "left2_bgra.h"
+#include "left3_bgra.h"
+
+#include "right1_bgra.h"
+#include "right2_bgra.h"
+#include "right3_bgra.h"
+
 #define TILE_HEIGHT 24
 #define TILE_WIDTH 24
 
@@ -599,6 +615,40 @@ static int player_start [NUM_PLAYER_STATES] = {
 	64
 };
 
+static int arcade_frames[4] = {
+	0,
+	2,
+	3,
+	0
+};
+
+static u8 * arcade_outputs [4][4] = {
+	{
+		up1_bgra,
+		up2_bgra,
+		up2_bgra,
+		up3_bgra
+	},
+	{
+		down1_bgra,
+		down2_bgra,
+		down2_bgra,
+		down3_bgra
+	},
+	{
+		left1_bgra,
+		left2_bgra,
+		left2_bgra,
+		left3_bgra
+	},
+	{
+		right1_bgra,
+		right2_bgra,
+		right2_bgra,
+		right3_bgra
+	}
+};
+
 /* Codigos de salida */
 enum {
 	GAME_NONE = 0, /* No usado */
@@ -684,7 +734,101 @@ void copy_tile (gfxScreen_t screen, gfx3dSide_t side, Punto *rect, int tile) {
 		}
 		fbAdr += fbWidth * 3;
 		tile_data += TILE_MAP_WIDTH * 4;
-		//printf ("D_t_d: %p. ", tile_data);
+	}
+}
+
+void gfxDrawSprite (gfxScreen_t screen, gfx3dSide_t side, const u8* spriteData, u16 width, u16 height, s16 x, s16 y) {
+	if (!spriteData) return;
+
+	u16 fbWidth, fbHeight;
+	u8* fbAdr = gfxGetFramebuffer (screen, side, &fbWidth, &fbHeight);
+	if (x + width < 0 || x >= fbWidth) return;
+	if (y + height < 0 || y >= fbHeight) return;
+	
+	u16 xOffset = 0, yOffset = 0;
+	u16 widthDrawn = width, heightDrawn = height;
+	
+	if (x < 0) xOffset = -x;
+	if (y < 0) yOffset = -y;
+	if (x + width >= fbWidth) widthDrawn = fbWidth - x;
+	if (y + height >= fbHeight) heightDrawn = fbHeight - y;
+	widthDrawn -= xOffset;
+	heightDrawn -= yOffset;
+
+	int j;
+	for (j = yOffset; j < yOffset + heightDrawn; j++) {
+		memcpy(&fbAdr[((x+xOffset)+(y+j)*fbWidth)*3], &spriteData[((xOffset)+(j)*width)*3], widthDrawn*3);
+	}
+}
+
+void gfxDrawTransSprite (gfxScreen_t screen, gfx3dSide_t side, const u8* spriteData, u16 width, u16 height, s16 x, s16 y) {
+	if (!spriteData) return;
+
+	u16 fbWidth, fbHeight;
+	u8* fbAdr = gfxGetFramebuffer (screen, side, &fbWidth, &fbHeight);
+	
+	if (x + width < 0 || x >= fbWidth) return;
+	if (y + height < 0 || y >= fbHeight) return;
+
+	u16 xOffset=0, yOffset=0;
+	u16 widthDrawn=width, heightDrawn=height;
+
+	if (x < 0) xOffset = -x;
+	if (y < 0) yOffset = -y;
+	if (x+width >= fbWidth) widthDrawn = fbWidth - x;
+	if (y+height >= fbHeight) heightDrawn = fbHeight - y;
+	widthDrawn -= xOffset;
+	heightDrawn -= yOffset;
+
+	//TODO : optimize
+	fbAdr += (y + yOffset) * fbWidth * 3;
+	spriteData += yOffset * width * 4; /* La imagen es ABGR */
+	int j, i;
+	u8 alpha;
+	for (j = yOffset; j < yOffset + heightDrawn; j++) {
+		u8* fbd = &fbAdr[(x+xOffset) * 3];
+		const u8* data = &spriteData[(xOffset) * 4]; /* La imagen es ABGR */
+		for (i = xOffset; i < xOffset + widthDrawn; i++, fbd += 3, data += 4) {
+			alpha = data[3];
+			if (alpha == 0) continue; /* 255 = Opaco, 0 = Trans */
+			fbd[0] = ((data[0] * alpha) + (fbd[0] * (255 - alpha))) / 256;
+			fbd[1] = ((data[1] * alpha) + (fbd[1] * (255 - alpha))) / 256;
+			fbd[2] = ((data[2] * alpha) + (fbd[2] * (255 - alpha))) / 256;
+		}
+		fbAdr += fbWidth * 3;
+		spriteData += width * 4;
+	}
+}
+
+void gfxFillRect (gfxScreen_t screen, gfx3dSide_t side, SDL_Rect *rect, u8 b, u8 g, u8 r) {
+	u16 fbWidth, fbHeight;
+	u8* fbAdr = gfxGetFramebuffer (screen, side, &fbWidth, &fbHeight);
+	u8* fbd;
+	int j, i;
+	
+	if (rect == NULL) return;
+	
+	if (rect->x + rect->w < 0 || rect->x >= fbWidth) return;
+	if (rect->y + rect->h < 0 || rect->y >= fbHeight) return;
+
+	u16 xOffset=0, yOffset=0;
+	u16 widthDrawn = rect->w, heightDrawn = rect->h;
+
+	if (rect->x < 0) xOffset = -rect->x;
+	if (rect->y < 0) yOffset = -rect->y;
+	if (rect->x + rect->w >= fbWidth) widthDrawn = fbWidth - rect->x;
+	if (rect->y + rect->h >= fbHeight) heightDrawn = fbHeight - rect->y;
+	widthDrawn -= xOffset;
+	heightDrawn -= yOffset;
+	
+	for (j = yOffset; j < yOffset + heightDrawn; j++) {
+		fbd = &fbAdr[(rect->x+xOffset) * 3];
+		for (i = xOffset; i < xOffset + widthDrawn; i++, fbd += 3) {
+			fbd[0] = b;
+			fbd[1] = r;
+			fbd[2] = g;
+		}
+		fbAdr += fbWidth * 3;
 	}
 }
 
@@ -738,6 +882,7 @@ int game_loop (void) {
 	Punto abc;
 	Warp warps[2];
 	int sub_scroll_x, sub_scroll_y;
+	SDL_Rect rect;
 	
 	Punto scroll, return_scroll;
 	SDL_Rect map_size;
@@ -1356,6 +1501,42 @@ int game_loop (void) {
 			copy_tile (GFX_TOP, GFX_LEFT, &abc, TILE_BLOCK);
 		}
 		
+		/* Dibujar los botones de arcade */
+		if (last_key & DOWN) {
+			arcade_button_down = 1;
+		}
+		arcade_button_down = arcade_frames[arcade_button_down];
+		if (last_key & UP) {
+			arcade_button_up = 1;
+		}
+		arcade_button_up = arcade_frames[arcade_button_up];
+		if (last_key & LEFT) {
+			arcade_button_left = 1;
+		}
+		arcade_button_left = arcade_frames[arcade_button_left];
+		if (last_key & RIGHT) {
+			arcade_button_right = 1;
+		}
+		arcade_button_right = arcade_frames[arcade_button_right];
+		
+		/* Borrar la pantalla inferior */
+		rect.x = rect.y = 0;
+		rect.w = 240;
+		rect.h = 320;
+		gfxFillRect (GFX_BOTTOM, GFX_LEFT, &rect, 0xFF, 0xF1, 0xD9);
+		
+		/* rect.x = 64; rect.y = 83; */
+		gfxDrawTransSprite (GFX_BOTTOM, GFX_LEFT, arcade_outputs[2][arcade_button_left], 72, 45, 240 - 83 - 72, 64);
+		
+		/* rect.x = 211; */
+		gfxDrawTransSprite (GFX_BOTTOM, GFX_LEFT, arcade_outputs[3][arcade_button_right], 72, 45, 240 - 83 - 72, 211);
+		
+		/* rect.x = 118; rect.y = 40; */
+		gfxDrawTransSprite (GFX_BOTTOM, GFX_LEFT, arcade_outputs[0][arcade_button_up], 42, 85, 240 - 40 - 42, 118);
+		
+		/* rect.x = 116; rect.y = 163; */
+		gfxDrawTransSprite (GFX_BOTTOM, GFX_LEFT, arcade_outputs[1][arcade_button_down], 48, 89, 240 - 163 - 48, 116);
+		
 		//Wait for VBlank
 		gspWaitForVBlank();
 		
@@ -1421,7 +1602,7 @@ void setup (void) {
 	gfxSet3D(0);
 	gfxSetDoubleBuffering (GFX_BOTTOM, 1);
 	
-	consoleInit(GFX_BOTTOM, NULL);
+	//consoleInit(GFX_BOTTOM, NULL);
 }
 
 void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, int last_solved, Warp *warps, Punto *movible, int *warp_enable, SDL_Rect *map_size) {
