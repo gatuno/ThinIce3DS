@@ -664,7 +664,7 @@ static int arcade_frames[4] = {
 	0
 };
 
-static u8 * arcade_outputs [4][4] = {
+static const u8 * arcade_outputs [4][4] = {
 	{
 		up1_bgra,
 		up2_bgra,
@@ -908,7 +908,7 @@ int game_loop (void) {
 	u64 last_time, now_time;
 	int g, h;
 	u32 keys;
-	int last_key;
+	int last_key, last_touch;
 	
 	int tiles_flipped, snow_melted, save_snow_melted;
 	int bonus_point, solved_points;
@@ -943,6 +943,7 @@ int game_loop (void) {
 	SDL_Rect map_size;
 	int arcade_button_left = 0, arcade_button_right = 0, arcade_button_up = 0, arcade_button_down = 0;
 	int scroll_mode = SCROLL_NONE, scroll_dir;
+	touchPosition tp;
 	
 	tiles_flipped = save_tiles_flipped = snow_melted = save_snow_melted = 0;
 	solved_points = bonus_point = save_bonus_point = solved_stages = 0;
@@ -955,7 +956,7 @@ int game_loop (void) {
 	movible_wall_up = movible_wall_down = movible_wall_left = movible_wall_right = FALSE;
 	slide_block = llave = 0;
 	player_die = FALSE;
-	last_key = 0;
+	last_key = last_touch = 0;
 	score = tally = 0;
 	
 	player.x = save_player.x = 14; // 14
@@ -1011,6 +1012,24 @@ int game_loop (void) {
 			last_key &= ~LEFT;
 		} else if (keys & KEY_RIGHT) {
 			last_key &= ~RIGHT;
+		}
+		
+		keys = hidKeysHeld ();
+		
+		last_touch = 0;
+		if (keys & KEY_TOUCH) {
+			/* Si toca los botones, provocar el movimiento */
+			hidTouchRead (&tp);
+			
+			if (tp.px >= 119 && tp.px < 202 && tp.py >= 38 && tp.py < 78) {
+				last_touch = UP;
+			} else if (tp.px >= 63 && tp.px < 109 && tp.py >= 82 && tp.py < 152) {
+				last_touch = LEFT;
+			} else if (tp.px >= 212 && tp.px < 258 && tp.py >= 82 && tp.py < 152) {
+				last_touch = RIGHT;
+			} else if (tp.px >= 116 && tp.px < 206 && tp.py >= 162 && tp.py < 208) {
+				last_touch = DOWN;
+			}
 		}
 		
 		tile_actual = &mapa[player.y][player.x];
@@ -1291,7 +1310,7 @@ int game_loop (void) {
 		}
 		
 		if (scroll_mode == SCROLL_NONE && player_moving == 0) {
-			if (last_key & DOWN && !wall_down) {
+			if (((last_key & DOWN) || (last_touch & DOWN)) && !wall_down) {
 				next_player.y = player.y + 1;
 				next_player.x = player.x;
 				player_moving = 3;
@@ -1302,7 +1321,7 @@ int game_loop (void) {
 					slide_block = DOWN;
 					playSFX (&sonidos[SND_MOVE]);
 				}
-			} else if (last_key & UP && !wall_up) {
+			} else if (((last_key & UP) || (last_touch & UP)) && !wall_up) {
 				next_player.y = player.y - 1;
 				next_player.x = player.x;
 				player_moving = 3;
@@ -1313,7 +1332,7 @@ int game_loop (void) {
 					slide_block = UP;
 					playSFX (&sonidos[SND_MOVE]);
 				}
-			} else if (last_key & LEFT && !wall_left) {
+			} else if (((last_key & LEFT) || (last_touch & LEFT)) && !wall_left) {
 				next_player.y = player.y;
 				next_player.x = player.x - 1;
 				player_moving = 3;
@@ -1324,7 +1343,7 @@ int game_loop (void) {
 					slide_block = LEFT;
 					playSFX (&sonidos[SND_MOVE]);
 				}
-			} else if (last_key & RIGHT && !wall_right) {
+			} else if (((last_key & RIGHT) || (last_touch & RIGHT)) && !wall_right) {
 				next_player.y = player.y;
 				next_player.x = player.x + 1;
 				player_moving = 3;
@@ -1557,19 +1576,19 @@ int game_loop (void) {
 		}
 		
 		/* Dibujar los botones de arcade */
-		if (last_key & DOWN) {
+		if ((last_key & DOWN) || (last_touch & DOWN)) {
 			arcade_button_down = 1;
 		}
 		arcade_button_down = arcade_frames[arcade_button_down];
-		if (last_key & UP) {
+		if ((last_key & UP) || (last_touch & UP)) {
 			arcade_button_up = 1;
 		}
 		arcade_button_up = arcade_frames[arcade_button_up];
-		if (last_key & LEFT) {
+		if ((last_key & LEFT) || (last_touch & LEFT)) {
 			arcade_button_left = 1;
 		}
 		arcade_button_left = arcade_frames[arcade_button_left];
-		if (last_key & RIGHT) {
+		if ((last_key & RIGHT) || (last_touch & RIGHT)) {
 			arcade_button_right = 1;
 		}
 		arcade_button_right = arcade_frames[arcade_button_right];
@@ -1592,11 +1611,11 @@ int game_loop (void) {
 		/* rect.x = 116; rect.y = 163; */
 		gfxDrawTransSprite (GFX_BOTTOM, GFX_LEFT, arcade_outputs[1][arcade_button_down], 48, 89, 240 - 163 - 48, 116);
 		
+		gfxSwapBuffers();
+		gfxFlushBuffers();
+		
 		//Wait for VBlank
 		gspWaitForVBlank();
-		
-		gfxFlushBuffers();
-		gfxSwapBuffers();
 		
 		now_time = svcGetSystemTick ();
 		if (now_time < last_time + FPS) svcSleepThread (last_time + FPS - now_time);
