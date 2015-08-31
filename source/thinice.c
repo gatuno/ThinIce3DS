@@ -38,6 +38,8 @@
 #include "sfx.h"
 #include "filesystem.h"
 
+#include "cp-button.h"
+
 #include "mapa1.h"
 #include "mapa2.h"
 #include "mapa3.h"
@@ -58,7 +60,13 @@
 #include "mapa18.h"
 #include "mapa19.h"
 
+#include "title_bgra.h"
+
+#include "puffle_on_ice_bgr.h"
+
 #include "tiles_bgra.h"
+#include "boton_ui_3_up_bgra.h"
+#include "boton_ui_3_down_bgra.h"
 
 #include "up1_bgra.h"
 #include "up2_bgra.h"
@@ -706,6 +714,21 @@ enum {
 };
 
 enum {
+	BUTTON_NONE = 0,
+	
+	BUTTON_START,
+	BUTTON_PLAY,
+	BUTTON_PREV,
+	BUTTON_NEXT,
+	
+	BUTTON_RESET,
+	
+	BUTTON_GET_COINS,
+	
+	NUM_BUTTONS
+};
+
+enum {
 	SCROLL_NONE = 0,
 	SCROLL_MANUAL,
 	SCROLL_FREE,
@@ -724,9 +747,11 @@ typedef struct {
 
 /* Prototipos de función */
 void setup (int argc, char *argv[]);
+int game_intro (void);
 int game_loop (void);
 void load_map (int nivel, int (*mapa)[19], int (*frames)[19], int *goal, int r, int last_solved, Warp *warps, Punto *movible, int *warp_enable, SDL_Rect *map_size);
 void area_secreta (int (*mapa)[19], int (*frames)[19], int solved_stages);
+int map_button_in_opening (int x, int y);
 
 /* Globales */
 int first_try_count, solved_stages, save_bonus_point, save_tiles_flipped, score, timepoints = 0;
@@ -881,8 +906,12 @@ int main (int argc, char *argv[]) {
 	
 	setup (argc, argv);
 	
+	/* Registrar botones */
+	cp_registrar_botones (NUM_BUTTONS);
+	cp_button_start ();
+	
 	do {
-		//if (game_intro () == GAME_QUIT) break;
+		if (game_intro () == GAME_QUIT) break;
 		if (game_loop () == GAME_QUIT) break;
 	} while (1 == 0);
 	
@@ -901,6 +930,82 @@ int main (int argc, char *argv[]) {
 	aptExit();
 	srvExit();
 	return 0;
+}
+
+int game_intro (void) {
+	int done = 0;
+	u64 last_time, now_time;
+	//int g, h;
+	u32 keys;
+	int map;
+	touchPosition tp;
+	SDL_Rect rect;
+	
+	while (aptMainLoop () && !done) {
+		last_time = svcGetSystemTick ();
+		hidScanInput ();
+		keys = hidKeysDown ();
+		
+		if (keys & KEY_START) {
+			done = GAME_QUIT;
+		}
+		
+		if (keys & KEY_TOUCH) {
+			/* Evento mousedown */
+			hidTouchRead (&tp);
+			map = map_button_in_opening (tp.px, tp.py);
+			cp_button_down (map);
+			if (map == BUTTON_START) {
+				playSFX (&sonidos[SND_BUTTON]);
+			}
+		}
+		
+		keys = hidKeysUp ();
+		
+		if (keys & KEY_TOUCH) {
+			/* Evento mouseup */
+			map = map_button_in_opening (tp.px, tp.py);
+			map = cp_button_up (map);
+			
+			if (map == BUTTON_START) {
+				done = GAME_CONTINUE;
+			}
+		}
+		
+		keys = hidKeysHeld ();
+		if (keys & KEY_TOUCH) {
+			/* Evento mouse motion */
+			hidTouchRead (&tp);
+			map = map_button_in_opening (tp.px, tp.py);
+			cp_button_motion (map);
+		}
+		
+		gfxDrawSprite (GFX_TOP, GFX_LEFT, puffle_on_ice_bgr, 240, 400, 0, 0);
+		
+		/* Borrar la pantalla inferior */
+		rect.x = rect.y = 0;
+		rect.w = 240;
+		rect.h = 320;
+		gfxFillRect (GFX_BOTTOM, GFX_LEFT, &rect, 0xFF, 0xF1, 0xD9);
+		
+		gfxDrawTransSprite (GFX_BOTTOM, GFX_LEFT, title_bgra, 66, 286, 87, 17);
+		
+		if (cp_button_frames[BUTTON_START] == 0) {
+			gfxDrawTransSprite (GFX_BOTTOM, GFX_LEFT, boton_ui_3_up_bgra, 28, 141, 10, 90);
+		} else {
+			gfxDrawTransSprite (GFX_BOTTOM, GFX_LEFT, boton_ui_3_down_bgra, 28, 141, 10, 90);
+		}
+		gfxSwapBuffers();
+		gfxFlushBuffers();
+		
+		//Wait for VBlank
+		gspWaitForVBlank();
+		
+		now_time = svcGetSystemTick ();
+		if (now_time < last_time + FPS) svcSleepThread (last_time + FPS - now_time);
+	}
+	
+	return done;
 }
 
 int game_loop (void) {
@@ -2178,3 +2283,7 @@ void area_secreta (int (*mapa)[19], int (*frames)[19], int solved_stages) {
 	}
 }
 
+int map_button_in_opening (int x, int y) {
+	if (x >= 90 && x < 234 && y >= 199 && y < 228) return BUTTON_START;
+	return BUTTON_NONE;
+}
